@@ -2,7 +2,7 @@
 using namespace std;
 // git test
 float a = 1;
-
+float b = a * 2;
 int main()
 {
     // Plan of action.
