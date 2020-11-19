@@ -1,6 +1,8 @@
 import pygame
 import numpy as np
 import sim
+import matplotlib.pyplot as plt
+
 
 pygame.init()
 
@@ -8,12 +10,19 @@ pygame.init()
 width = 500
 height = 500
 time_step = 0.1
+infection_radius = 25
+infection_prob = 1
+k=5 # nearest neighbours to check
+time_to_recover = 2000
 screen = pygame.display.set_mode([width, height])
 sim = sim.Simulation(width, height, [])
-sim.add_people_random(100, False, False, [0,0])
+sim.add_people_random(100, infected=False, recovered=False, velocity=[0, 0])
+sim.add_people_random(1, infected=True, recovered=False, velocity=[0, 0])
 sim.add_random_vel(1)
 
-# Run until the user asks to quit
+counts_susceptible = []
+counts_infected = []
+counts_recovered = []
 running = True
 while running:
 
@@ -25,9 +34,15 @@ while running:
     sim.display()
     sim.add_random_vel(0.05)
     sim.update_pos(0.1)
+    sim.update_people(k,infection_radius, infection_prob, time_to_recover)
+    counts_susceptible.append(len([person for person in sim.people if not(person.recovered or person.infected)]))
+    counts_infected.append(len([person for person in sim.people if person.infected]))
+    counts_recovered.append(len([person for person in sim.people if person.recovered]))
 
 # Done! Time to quit.
 pygame.quit()
-
-# TODO: I have to decide whether I want to use taxicab distance or Euclidean.
+plt.plot(counts_infected)
+plt.plot(counts_susceptible)
+plt.plot(counts_recovered)
+plt.show()
 # I think the general idea
