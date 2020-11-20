@@ -92,48 +92,76 @@ class Simulation:
             Fix:  If number of infected people < susceptible then do the same.
             Otherwise create an infected KDTree and search the susceptible points through it.
         '''
-        points = [person.pos for person in self.people if not person.infected and not person.recovered]
+        sus_points = [person.pos for person in self.people if not person.infected and not person.recovered]
+        inf_points = [person.pos for person in self.people if person.infected]
+        k_s = len(sus_points)
+        k_i = len(inf_points)
+        if k_s < k_i:
+            k = min(k, k_s)
+            if k == 0:
+                return
+            arr = np.array(sus_points)
+            my_tree = KDTree(arr)
 
-        k = min(len(points), k)
-        print(k)
-        if k == 0:
-            return
-        arr = np.array(points)
-        my_tree = KDTree(arr)
-        infected_persons = ([person.pos for person in self.people if person.infected])
-        infected_persons_points = np.array(infected_persons)
-        if not infected_persons:
-            return
-        array_pair = my_tree.query(infected_persons_points, k)
-        index_mem = []
-        for j in range(len(infected_persons)):
-            indices = array_pair[1][j]
-            distances = array_pair[0][j]
+            infected_persons_points = np.array(inf_points)
+            if not inf_points:
+                return
+            array_pair = my_tree.query(infected_persons_points, k)
+            index_mem = []
+            for j in range(k_i):
+                indices = array_pair[1][j]
+                distances = array_pair[0][j]
 
-            for i, distance in enumerate(distances):
-                ix = indices[i]
-                if distance < infection_radius:
-                    if random.random() < infection_prob:
-                        index_mem.append(ix)
+                for i, distance in enumerate(distances):
+                    ix = indices[i]
+                    if distance < infection_radius:
+                        if random.random() < infection_prob:
+                            index_mem.append(ix)
+            if not index_mem:
+                return
 
-        if not index_mem:
-            return
-
-        x = my_tree.data
-        for index in index_mem:
-            pos = [x[index][0], x[index][1]]
+            x = my_tree.data
+            for index in index_mem:
+                pos = [x[index][0], x[index][1]]
+                for person in self.people:
+                    if person.pos == pos:
+                        person.infected = True
+                        break
+        else:
+            # in this situation we check each susceptible person in the infected KDTree
+            k = min(k,k_i)
+            if k == 0:
+                return
+            arr = np.array(inf_points)
+            my_tree = KDTree(arr)
+            sus_persons_points = np.array(sus_points)
+            if not sus_points:
+                return
+            array_pair = my_tree.query(sus_persons_points, k)
+            pos_mem = []
+            for j in range(k_s):
+                indices = array_pair[1][j]
+                distances = array_pair[0][j]
+                for i, distance in enumerate(distances):
+                    ix = indices[i]
+                    if distance < infection_radius:
+                        if random.random() < infection_prob:
+                            pos_mem.append(sus_points[j])
             for person in self.people:
-                if person.pos == pos:
+                if person.pos in pos_mem:
                     person.infected = True
-                    break
+
+
+
 
     def update_people_infected(self, time_to_recover):
         for person in self.people:
             if person.infected:
                 person.time += 1
                 if person.time > time_to_recover:
-                    person.infected=False
-                    person.recovered=True
+                    person.infected = False
+                    person.recovered = True
+
 
 class Person:
     def __init__(self, pos, infected=False, recovered=False, velocity=[0, 0]):
