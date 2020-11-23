@@ -9,12 +9,12 @@ class Simulation:
         self.screen = pygame.display.set_mode([width, height])
         self.people = people
 
-    def add_person(self, pos, infected, recovered, velocity=[0, 0]):
-        person = Person(pos, infected, recovered, velocity)
+    def add_person(self, pos, infected, recovered, asymptomatic, velocity=[0, 0]):
+        person = Person(pos, infected, recovered, asymptomatic, velocity)
         self.people.append(person)
         return person
 
-    def add_people_random(self, n, infected, recovered, velocity=[0, 0]):
+    def add_people_random(self, n, infected, recovered, asymptomatic, velocity=[0, 0]):
         # Add a n people (either S I or R). (infected=False and recovered = False) => S
         w = self.screen.get_width()
         h = self.screen.get_height()
@@ -22,7 +22,7 @@ class Simulation:
         for i in range(n):
             x_pos = w * random.random()
             y_pos = h * random.random()
-            self.add_person([x_pos, y_pos], infected, recovered, velocity)
+            self.add_person([x_pos, y_pos], infected, recovered, asymptomatic, velocity)
 
     def display(self):
 
@@ -30,10 +30,14 @@ class Simulation:
         green = (0, 255, 0)
         blue = (0, 0, 255)
         white = (255, 255, 255)
+        yellow = (255, 255, 0)
         self.screen.fill(white)
         for person in self.people:
             if person.infected:
-                colour = red
+                if person.asymptomatic:
+                    colour = yellow
+                else:
+                    colour = red
             elif person.recovered:
                 colour = green
             else:
@@ -77,25 +81,19 @@ class Simulation:
             vec_size = (v0 * v0 + v1 * v1) ** 0.5
             person.velocity = [v0 / vec_size, v1 / vec_size]
 
-    def update_people(self, k, infection_radius, infection_prob, time_to_recover):
+    def update_people(self, k, infection_radius, infection_prob, incubation_period, time_to_recover):
         self.update_people_susceptible(k, infection_radius, infection_prob)
-        self.update_people_infected(time_to_recover)
+        self.update_people_infected(incubation_period,time_to_recover)
         return
 
     def update_people_susceptible(self, k, infection_radius, infection_prob):
-        # want to use KD-trees (sklearn)
-        #
-        '''
-        TODO:
-            The KDTree approach gets inefficient when the amount of infected people gets small.
-            This in turn makes the tree small - so we are searching loads of infected people through a small tree.
-            Fix:  If number of infected people < susceptible then do the same.
-            Otherwise create an infected KDTree and search the susceptible points through it.
-        '''
-        sus_points = [person.pos for person in self.people if not person.infected and not person.recovered]
-        inf_points = [person.pos for person in self.people if person.infected]
+        sus_points = [person.pos for person in self.people if not (person.infected or person.recovered)]
+        inf_points = [person.pos for person in self.people if person.infected and not person.asymptomatic]
         k_s = len(sus_points)
         k_i = len(inf_points)
+        if k_s == 0:
+            return
+
         if k_s < k_i:
             k = min(k, k_s)
             if k == 0:
@@ -129,7 +127,7 @@ class Simulation:
                         break
         else:
             # in this situation we check each susceptible person in the infected KDTree
-            k = min(k,k_i)
+            k = min(k, k_i)
             if k == 0:
                 return
             arr = np.array(inf_points)
@@ -151,23 +149,33 @@ class Simulation:
                 if person.pos in pos_mem:
                     person.infected = True
 
+    def update_people_infected(self, incubation_period, time_to_recover):
+        if time_to_recover < incubation_period:
+            raise Exception("time_to_recover should be greater than the incubation period by definition")
 
-
-
-    def update_people_infected(self, time_to_recover):
         for person in self.people:
             if person.infected:
-                person.time += 1
-                if person.time > time_to_recover:
+                person.time_infected += 1
+                if 0 < person.time_infected < incubation_period:
+                    person.asymptomatic = True
+                elif incubation_period <= person.time_infected < time_to_recover:
+                    person.asymptomatic = False
+                else:
                     person.infected = False
                     person.recovered = True
 
+    def social_distance(self):
+        # not sure what inputs needed yet.
+        pass
+
 
 class Person:
-    def __init__(self, pos, infected=False, recovered=False, velocity=[0, 0]):
+    def __init__(self, pos, infected=False, recovered=False, asymptomatic=False, velocity=[0, 0]):
         self.pos = pos
         self.infected = infected
         self.velocity = velocity
         self.recovered = recovered
-        self.time = 0
+        self.asymptomatic = False
+        self.time_infected = 0
+
         # Can add more features but got the basics.
